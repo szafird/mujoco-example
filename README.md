@@ -3,9 +3,9 @@
 A minimal Jupyter notebook demonstrating MJCF, physics stepping, plots, and inline offscreen rendering.
 
 ## Binder
-Push the files in this folder to the **root** of a public GitHub repository. Open:
+Open in Binder:
 
-`https://mybinder.org/v2/gh/USERNAME/REPO/HEAD?labpath=mujoco_intro.ipynb`
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/szafird/mujoco-example/HEAD?labpath=mujoco_intro.ipynb)   
 
 Binder installs `apt.txt` and `requirements.txt` automatically. The notebook uses OSMesa software rendering.
 
