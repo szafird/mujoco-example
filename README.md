@@ -7,6 +7,10 @@ Open in Binder:
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/szafird/mujoco-example/HEAD?labpath=mujoco_intro.ipynb)   
 
+```
+https://mybinder.org/v2/gh/szafird/mujoco-example/HEAD?labpath=mujoco_intro.ipynb
+```
+
 Binder installs `apt.txt` and `requirements.txt` automatically. The notebook uses OSMesa software rendering.
 
 ## Google Colab
