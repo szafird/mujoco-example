@@ -1,6 +1,2 @@
-mujoco>=3.2,<4
-numpy>=1.26
-matplotlib>=3.8
-Pillow>=10
-imageio>=2.34
-notebook>=7
+anywidget>=0.9,<1
+ipywidgets>=8,<9

@@ -1,6 +1,6 @@
-# MuJoCo Intro — Binder and Colab
+# MuJoCo Intro — Binder and Colab 
 
-A minimal Jupyter notebook demonstrating MJCF, physics stepping, plots, and inline offscreen rendering.
+A minimal Jupyter notebook demonstrating MJCF, physics stepping, plots, and inline offscreen rendering and a small **experimental** Jupyter widget: Python provides the MJCF and sends occasional commands; MuJoCo physics and Three.js rendering run in the browser. Orbit/zoom, play/pause/reset, gravity changes, and a control-index API are included.
 
 ## Binder
 Open in Binder:
@@ -11,13 +11,24 @@ Open in Binder:
 https://mybinder.org/v2/gh/szafird/mujoco-example/HEAD?labpath=mujoco_intro.ipynb
 ```
 
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/szafird/mujoco-example/HEAD?labpath=mujoco_live.ipynb)   
+
+```
+https://mybinder.org/v2/gh/szafird/mujoco-example/HEAD?labpath=mujoco_live.ipynb
+```
+
 Binder installs `apt.txt` and `requirements.txt` automatically. The notebook uses OSMesa software rendering.
 
 ## Google Colab
-Upload `mujoco_intro.ipynb` to Colab, then run cells in order. The first code cell installs dependencies if missing. **Colab Linux may not have OSMesa installed**. If rendering fails, the notebook still plots the physics trajectory. To enable rendering on Colab, run this cell **before importing MuJoCo**, then restart the runtime if MuJoCo was already imported:
+- For intro example: upload `mujoco_intro.ipynb` to Colab, then run cells in order. The first code cell installs dependencies if missing. **Colab Linux may not have OSMesa installed**. If rendering fails, the notebook still plots the physics trajectory. To enable rendering on Colab, run this cell **before importing MuJoCo**, then restart the runtime if MuJoCo was already imported:
 
 ```python
 !apt-get -qq update && apt-get -qq install -y libosmesa6 libgl1-mesa-dri
 ```
 
 Then rerun from the top. Colab runtimes vary; software rendering availability is environment-dependent.
+
+- For widget example: upload the notebook **and `mujoco_widget.py` and `viewer.js`** to the Colab runtime (Files sidebar) and run the notebook. If using Google Drive, mount Drive and `%cd` into the folder containing the files.
+- Local: `pip install -r requirements.txt && jupyter lab`.
+
+The viewer loads JavaScript and WASM from public CDNs and requires an internet connection. This is **not an offline or production-ready package**. Browser CSP/CORS policies or CDN package layouts can prevent it from loading, particularly in Colab. If that occurs, use browser devtools and report the error.
