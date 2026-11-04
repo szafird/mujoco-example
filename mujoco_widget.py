@@ -11,8 +11,8 @@ class MuJoCoViewer(anywidget.AnyWidget):
     status = traitlets.Unicode('Loading…').tag(sync=True)
     sim_time = traitlets.Float(0).tag(sync=True)
     def __init__(self, xml, **kwargs):
-        super().__init__(xml=xml, **kwargs)
         self._seq = 0
+        super().__init__(xml=xml, **kwargs)
     def _send(self, op, **kwargs):
         self._seq += 1
         self.command = json.dumps(dict(seq=self._seq, op=op, **kwargs))
