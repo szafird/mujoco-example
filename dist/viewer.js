@@ -34187,7 +34187,33 @@ var wasmBinary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 // src/viewer.js
 var modulePromise;
 function getMujoco() {
-  modulePromise ||= mujoco_default({ wasmBinary });
+  if (!modulePromise) {
+    modulePromise = (async () => {
+      console.log("=== MuJoCo WASM Diagnostics ===");
+      console.log("WASM binary:", {
+        type: wasmBinary?.constructor?.name,
+        length: wasmBinary?.byteLength,
+        isUint8Array: wasmBinary instanceof Uint8Array
+      });
+      const compiled = await WebAssembly.compile(wasmBinary);
+      const imports = WebAssembly.Module.imports(compiled);
+      console.log(
+        "Memory imports:",
+        imports.filter((x) => x.kind === "memory")
+      );
+      const memory = new WebAssembly.Memory({
+        initial: 256,
+        maximum: 4096
+      });
+      console.log("Created WebAssembly.Memory:", memory);
+      const mujoco = await mujoco_default({
+        wasmBinary,
+        wasmMemory: memory
+      });
+      console.log("MuJoCo initialized successfully!");
+      return mujoco;
+    })();
+  }
   return modulePromise;
 }
 var viewer_default = {
