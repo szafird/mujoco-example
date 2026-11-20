@@ -5,7 +5,7 @@ import traitlets
 
 class MuJoCoViewer(anywidget.AnyWidget):
     """Browser-side MuJoCo WASM physics and Three.js visualization."""
-    _esm = Path(__file__).with_name('viewer.js')
+    _esm = Path(__file__).parent / 'dist' / 'viewer.js'
     xml = traitlets.Unicode('').tag(sync=True)
     command = traitlets.Unicode('').tag(sync=True)
     status = traitlets.Unicode('Loading…').tag(sync=True)

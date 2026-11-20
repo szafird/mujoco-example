@@ -1,2 +1,3 @@
 anywidget>=0.9,<1
-ipywidgets>=8,<9
+traitlets>=5
+ipywidgets>=8
