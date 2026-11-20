@@ -34202,7 +34202,13 @@ function getMujoco() {
         imports.filter((x) => x.kind === "memory")
       );
       const mujoco = await mujoco_default({
-        wasmBinary
+        wasmBinary,
+        // Provide a valid URL if the loader tries to locate
+        // the WASM file, even though its bytes are embedded.
+        locateFile: (path) => {
+          console.log("MuJoCo locateFile requested:", path);
+          return new URL(path, window.location.href).href;
+        }
       });
       console.log("MuJoCo initialized successfully!");
       return mujoco;
