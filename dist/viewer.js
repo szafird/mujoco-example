@@ -34201,14 +34201,8 @@ function getMujoco() {
         "Memory imports:",
         imports.filter((x) => x.kind === "memory")
       );
-      const memory = new WebAssembly.Memory({
-        initial: 256,
-        maximum: 4096
-      });
-      console.log("Created WebAssembly.Memory:", memory);
       const mujoco = await mujoco_default({
-        wasmBinary,
-        wasmMemory: memory
+        wasmBinary
       });
       console.log("MuJoCo initialized successfully!");
       return mujoco;
