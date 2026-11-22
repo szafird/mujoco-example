@@ -24,14 +24,13 @@ class MuJoCoViewer(_BaseWidget):
     sim_time = traitlets.Float(0).tag(sync=True)
 
     def __init__(self, xml, asset_base, **kwargs):
-        self._seq = 0
         super().__init__(asset_base=asset_base, xml=xml, **kwargs)
 
-    def _send(self, op, **kwargs):
+    def _send_command(self, op, **kwargs):
         self.send({"op": op, **kwargs})
 
-    def pause(self): self._send("pause")
-    def play(self): self._send("play")
-    def reset(self): self._send("reset")
-    def set_gravity(self, value): self._send("gravity", value=float(value))
-    def set_control(self, index, value): self._send("control", index=int(index), value=float(value))
+    def pause(self): self._send_command("pause")
+    def play(self): self._send_command("play")
+    def reset(self): self._send_command("reset")
+    def set_gravity(self, value): self._send_command("gravity", value=float(value))
+    def set_control(self, index, value): self._send_command("control", index=int(index), value=float(value))
