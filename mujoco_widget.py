@@ -31,6 +31,9 @@ class MuJoCoViewer(_BaseWidget):
         self.on_msg(self._receive_message)
 
     def _receive_message(self, widget, content, buffers):
+        import threading
+        print("Reply thread:", threading.get_ident())
+        print("Reply loop:", id(loop))
         print("[MuJoCo] Received from JavaScript:", content)
 
         if content.get("type") != "reply":
@@ -66,6 +69,9 @@ class MuJoCoViewer(_BaseWidget):
 
     async def _request(self, op, timeout=10.0, **kwargs):
         loop = asyncio.get_running_loop()
+        import threading
+        print("Request thread:", threading.get_ident())
+        print("Request loop:", id(loop))
         request_id = next(self._request_ids)
 
         future = loop.create_future()
