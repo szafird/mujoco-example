@@ -32,6 +32,7 @@ class MuJoCoViewer(_BaseWidget):
 
     def _receive_message(self, widget, content, buffers):
         import threading
+        print("in receive_message")
         print("Reply thread:", threading.get_ident())
         print("Reply loop:", id(loop))
         print("[MuJoCo] Received from JavaScript:", content)
