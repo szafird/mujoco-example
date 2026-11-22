@@ -31,6 +31,9 @@ class MuJoCoViewer(_BaseWidget):
         self.on_msg(self._receive_message)
 
     def _receive_message(self, widget, content, buffers):
+
+        print("[MuJoCo] Received from JavaScript:", content)
+        
         if content.get("type") != "reply":
             return
         future = self._pending.pop(content.get("id"), None)

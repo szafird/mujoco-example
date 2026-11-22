@@ -26765,6 +26765,7 @@ var viewer_default = {
     };
     model.on("msg:custom", onMessage);
     play.onclick = () => {
+      console.log("Play clicked!");
       running = !running;
       play.textContent = running ? "Pause" : "Play";
     };
@@ -26774,6 +26775,16 @@ var viewer_default = {
         mj.mj_forward(m, d);
       }
     };
+    const testButton = document.createElement("button");
+    testButton.textContent = "Test JS \u2192 Python";
+    testButton.onclick = () => {
+      console.log("[MuJoCo] Sending test message to Python");
+      model.send({
+        type: "test",
+        message: "Hello from JavaScript"
+      });
+    };
+    el.appendChild(testButton);
     try {
       setStatus("Loading Three.js\u2026");
       setStatus("Loading orbit controls\u2026");
