@@ -1,5 +1,7 @@
+"""MuJoCo browser widget: Python commands + asynchronous request/reply."""
 from pathlib import Path
-import json
+import asyncio
+import itertools
 import anywidget
 import traitlets
 
@@ -20,17 +22,52 @@ class MuJoCoSmokeTest(_BaseWidget):
 class MuJoCoViewer(_BaseWidget):
     _esm = ROOT / "dist" / "viewer.js"
     xml = traitlets.Unicode("").tag(sync=True)
-    command = traitlets.Unicode("").tag(sync=True)
     sim_time = traitlets.Float(0).tag(sync=True)
 
     def __init__(self, xml, asset_base, **kwargs):
+        self._pending = {}
+        self._request_ids = itertools.count(1)
         super().__init__(asset_base=asset_base, xml=xml, **kwargs)
+        self.on_msg(self._receive_message)
+
+    def _receive_message(self, widget, content, buffers):
+        if content.get("type") != "reply":
+            return
+        future = self._pending.pop(content.get("id"), None)
+        if future is None or future.done():
+            return
+        if "error" in content:
+            future.set_exception(RuntimeError(content["error"]))
+        else:
+            future.set_result(content.get("result"))
 
     def _send_command(self, op, **kwargs):
+        """Fire-and-forget command; frontend must be initialized."""
         self.send({"op": op, **kwargs})
 
-    def pause(self): self._send_command("pause")
+    async def _request(self, op, timeout=10.0, **kwargs):
+        """Send a command and await its browser response."""
+        loop = asyncio.get_running_loop()
+        request_id = next(self._request_ids)
+        future = loop.create_future()
+        self._pending[request_id] = future
+        try:
+            self.send({"op": op, "id": request_id, **kwargs})
+            return await asyncio.wait_for(future, timeout=timeout)
+        finally:
+            self._pending.pop(request_id, None)
+
     def play(self): self._send_command("play")
+    def pause(self): self._send_command("pause")
     def reset(self): self._send_command("reset")
     def set_gravity(self, value): self._send_command("gravity", value=float(value))
-    def set_control(self, index, value): self._send_command("control", index=int(index), value=float(value))
+    def set_control(self, index, value):
+        self._send_command("control", index=int(index), value=float(value))
+
+    async def get_sim_state(self):
+        return await self._request("get_state")
+
+    async def step(self, n=1, timeout=10.0):
+        if not isinstance(n, int) or not 1 <= n <= 10000:
+            raise ValueError("n must be an integer between 1 and 10000")
+        return await self._request("step", n=n, timeout=timeout)

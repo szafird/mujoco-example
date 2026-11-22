@@ -26705,23 +26705,64 @@ var viewer_default = {
       model.set("status", s);
       model.save_changes();
     };
-    const handleCommand = (command) => {
-      if (!mj || !m || !d) return;
-      if (command.op === "pause") running = false;
-      if (command.op === "play") running = true;
-      if (command.op === "reset") {
-        mj.mj_resetData(m, d);
-        mj.mj_forward(m, d);
+    const snapshot = () => ({
+      time: Number(d.time),
+      qpos: Array.from(d.qpos),
+      qvel: Array.from(d.qvel),
+      ctrl: Array.from(d.ctrl),
+      gravity: Array.from(m.opt.gravity),
+      timestep: Number(m.opt.timestep),
+      running
+    });
+    const onMessage = (command) => {
+      const id = command?.id;
+      const reply = (result, error) => {
+        if (id === void 0 || id === null) return;
+        model.send(error ? { type: "reply", id, error: String(error) } : { type: "reply", id, result });
+      };
+      if (!mj || !m || !d || disposed) {
+        reply(null, "Viewer not initialized yet");
+        return;
       }
-      if (command.op === "gravity") {
-        m.opt.gravity[2] = command.value;
+      try {
+        switch (command.op) {
+          case "pause":
+            running = false;
+            break;
+          case "play":
+            running = true;
+            break;
+          case "reset":
+            mj.mj_resetData(m, d);
+            mj.mj_forward(m, d);
+            break;
+          case "gravity":
+            m.opt.gravity[2] = Number(command.value);
+            break;
+          case "control":
+            if (!Number.isInteger(command.index) || command.index < 0 || command.index >= d.ctrl.length)
+              throw new Error(`Control index ${command.index} out of range (nu=${d.ctrl.length})`);
+            d.ctrl[command.index] = Number(command.value);
+            break;
+          case "get_state":
+            reply(snapshot());
+            break;
+          case "step": {
+            if (running) throw new Error("Pause the simulation before calling step()");
+            const n = Number(command.n);
+            if (!Number.isInteger(n) || n < 1 || n > 1e4) throw new Error("n must be 1..10000");
+            for (let i = 0; i < n; i++) mj.mj_step(m, d);
+            reply(snapshot());
+            break;
+          }
+          default:
+            throw new Error(`Unknown command: ${command.op}`);
+        }
+        play.textContent = running ? "Pause" : "Play";
+      } catch (e) {
+        reply(null, e?.message || String(e));
       }
-      if (command.op === "control" && command.index >= 0 && command.index < d.ctrl.length) {
-        d.ctrl[command.index] = command.value;
-      }
-      play.textContent = running ? "Pause" : "Play";
     };
-    const onMessage = (command) => handleCommand(command);
     model.on("msg:custom", onMessage);
     play.onclick = () => {
       running = !running;
