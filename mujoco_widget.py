@@ -28,8 +28,7 @@ class MuJoCoViewer(_BaseWidget):
         super().__init__(asset_base=asset_base, xml=xml, **kwargs)
 
     def _send(self, op, **kwargs):
-        self._seq += 1
-        self.command = json.dumps(dict(seq=self._seq, op=op, **kwargs))
+        self.send({"op": op, **kwargs})
 
     def pause(self): self._send("pause")
     def play(self): self._send("play")

@@ -26705,27 +26705,24 @@ var viewer_default = {
       model.set("status", s);
       model.save_changes();
     };
-    const handleCommand = () => {
+    const handleCommand = (command) => {
       if (!mj || !m || !d) return;
-      let c;
-      try {
-        c = JSON.parse(model.get("command"));
-      } catch {
-        return;
-      }
-      if (c.op === "pause") running = false;
-      if (c.op === "play") running = true;
-      if (c.op === "reset") {
+      if (command.op === "pause") running = false;
+      if (command.op === "play") running = true;
+      if (command.op === "reset") {
         mj.mj_resetData(m, d);
         mj.mj_forward(m, d);
       }
-      if (c.op === "gravity") {
-        m.opt.gravity[2] = c.value;
+      if (command.op === "gravity") {
+        m.opt.gravity[2] = command.value;
       }
-      if (c.op === "control" && c.index >= 0 && c.index < d.ctrl.length) d.ctrl[c.index] = c.value;
+      if (command.op === "control" && command.index >= 0 && command.index < d.ctrl.length) {
+        d.ctrl[command.index] = command.value;
+      }
       play.textContent = running ? "Pause" : "Play";
     };
-    model.on("change:command", handleCommand);
+    const onMessage = (command) => handleCommand(command);
+    model.on("msg:custom", onMessage);
     play.onclick = () => {
       running = !running;
       play.textContent = running ? "Pause" : "Play";
@@ -26842,7 +26839,7 @@ var viewer_default = {
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);
-      model.off("change:command", handleCommand);
+      model.off("msg:custom", onMessage);
       observer?.disconnect();
       controls?.dispose();
       for (const mesh of meshes) {
