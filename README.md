@@ -20,6 +20,9 @@ https://mybinder.org/v2/gh/szafird/mujoco-example/HEAD?labpath=mujoco_live.ipynb
 Binder installs `apt.txt` and `requirements.txt` automatically. The notebook uses OSMesa software rendering.
 
 ## Google Colab
+
+-navigate to [https://colab.research.google.com/github/szafird/mujoco-example/blob/main/mujoco_live.ipynb](https://colab.research.google.com/github/szafird/mujoco-example/blob/main/mujoco_live.ipynb)
+
 - For intro example: upload `mujoco_intro.ipynb` to Colab, then run cells in order. The first code cell installs dependencies if missing. **Colab Linux may not have OSMesa installed**. If rendering fails, the notebook still plots the physics trajectory. To enable rendering on Colab, run this cell **before importing MuJoCo**, then restart the runtime if MuJoCo was already imported:
 
 ```python
