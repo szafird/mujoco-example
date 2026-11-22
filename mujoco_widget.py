@@ -31,32 +31,55 @@ class MuJoCoViewer(_BaseWidget):
         self.on_msg(self._receive_message)
 
     def _receive_message(self, widget, content, buffers):
-
         print("[MuJoCo] Received from JavaScript:", content)
-        
+
         if content.get("type") != "reply":
             return
-        future = self._pending.pop(content.get("id"), None)
-        if future is None or future.done():
+
+        request_id = content.get("id")
+        pending = self._pending.get(request_id)
+
+        if pending is None:
+            print(f"[MuJoCo] No pending request for id={request_id}")
             return
-        if "error" in content:
-            future.set_exception(RuntimeError(content["error"]))
-        else:
-            future.set_result(content.get("result"))
+
+        loop, future = pending
+
+        def resolve():
+            if future.done():
+                return
+
+            if content.get("error"):
+                future.set_exception(
+                    RuntimeError(str(content["error"]))
+                )
+            else:
+                future.set_result(content.get("result"))
+
+        # Schedule completion on the event loop that owns the future.
+        loop.call_soon_threadsafe(resolve)
+
 
     def _send_command(self, op, **kwargs):
         """Fire-and-forget command; frontend must be initialized."""
         self.send({"op": op, **kwargs})
 
     async def _request(self, op, timeout=10.0, **kwargs):
-        """Send a command and await its browser response."""
         loop = asyncio.get_running_loop()
         request_id = next(self._request_ids)
+
         future = loop.create_future()
-        self._pending[request_id] = future
+        self._pending[request_id] = (loop, future)
+
         try:
-            self.send({"op": op, "id": request_id, **kwargs})
+            self.send({
+                "op": op,
+                "id": request_id,
+                **kwargs
+            })
+
             return await asyncio.wait_for(future, timeout=timeout)
+
         finally:
             self._pending.pop(request_id, None)
 
