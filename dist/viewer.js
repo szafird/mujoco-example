@@ -26747,28 +26747,6 @@ var viewer_default = {
           case "get_state":
             reply(snapshot());
             break;
-          case "controller_start": {
-            running = false;
-            reply(snapshot());
-            break;
-          }
-          case "controller_step": {
-            if (running) throw new Error("Controller requires paused simulation");
-            const n = Number(command.n);
-            if (!Number.isInteger(n) || n < 1 || n > 1e4)
-              throw new Error("Controller n must be 1..10000");
-            if (command.controls !== null && command.controls !== void 0) {
-              if (!Array.isArray(command.controls) || command.controls.length !== d.ctrl.length)
-                throw new Error(`Controller returned ${command.controls?.length} controls, expected ${d.ctrl.length}`);
-              for (let j = 0; j < d.ctrl.length; j++) {
-                if (!Number.isFinite(command.controls[j])) throw new Error("Controls must be finite numbers");
-                d.ctrl[j] = command.controls[j];
-              }
-            }
-            for (let i = 0; i < n; i++) mj.mj_step(m, d);
-            reply(snapshot());
-            break;
-          }
           case "step": {
             if (running) throw new Error("Pause the simulation before calling step()");
             const n = Number(command.n);
@@ -26787,6 +26765,7 @@ var viewer_default = {
     };
     model.on("msg:custom", onMessage);
     play.onclick = () => {
+      console.log("Play clicked!");
       running = !running;
       play.textContent = running ? "Pause" : "Play";
     };
@@ -26796,6 +26775,16 @@ var viewer_default = {
         mj.mj_forward(m, d);
       }
     };
+    const testButton = document.createElement("button");
+    testButton.textContent = "Test JS \u2192 Python";
+    testButton.onclick = () => {
+      console.log("[MuJoCo] Sending test message to Python");
+      model.send({
+        type: "test",
+        message: "Hello from JavaScript"
+      });
+    };
+    el.appendChild(testButton);
     try {
       setStatus("Loading Three.js\u2026");
       setStatus("Loading orbit controls\u2026");
