@@ -107,6 +107,8 @@ class MuJoCoViewer(_BaseWidget):
                 "id": request_id,
                 **kwargs
             })
+            # Yields to the Tornado event loop so Colab dispatches the message
+            await asyncio.sleep(0.01) 
 
             print(f"[{time.monotonic():.3f}] Request sent")
 
