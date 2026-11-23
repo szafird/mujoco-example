@@ -2,6 +2,7 @@
 from pathlib import Path
 import asyncio
 import itertools
+import threading
 import anywidget
 import traitlets
 
@@ -31,17 +32,22 @@ class MuJoCoViewer(_BaseWidget):
         self.on_msg(self._receive_message)
 
     def _receive_message(self, widget, content, buffers):
-        import threading
-        print("in receive_message")
-        print("Reply thread:", threading.get_ident())
-        print("Reply loop:", id(loop))
+        
         print("[MuJoCo] Received from JavaScript:", content)
 
         if content.get("type") != "reply":
             return
 
         request_id = content.get("id")
+
+        print("Received request ID:", request_id)
+        print("Pending request IDs:", list(self._pending.keys()))
+        print("Request ID type:", type(request_id))
+
+
         pending = self._pending.get(request_id)
+
+        print("Found pending request:", pending is not None)
 
         if pending is None:
             print(f"[MuJoCo] No pending request for id={request_id}")
@@ -49,7 +55,15 @@ class MuJoCoViewer(_BaseWidget):
 
         loop, future = pending
 
+        import threading
+        print("Reply thread:", threading.get_ident())
+        print("Reply loop:", id(loop))
+        print("Future done:", future.done())
+
         def resolve():
+            print("[MuJoCo] resolve() executing")
+            print("[MuJoCo] Future already done:", future.done())
+
             if future.done():
                 return
 
@@ -59,6 +73,8 @@ class MuJoCoViewer(_BaseWidget):
                 )
             else:
                 future.set_result(content.get("result"))
+
+            print("[MuJoCo] Future resolved:", future.done())
 
         # Schedule completion on the event loop that owns the future.
         loop.call_soon_threadsafe(resolve)
