@@ -5,6 +5,7 @@ import itertools
 import threading
 import anywidget
 import traitlets
+import time
 
 ROOT = Path(__file__).resolve().parent
 
@@ -32,6 +33,11 @@ class MuJoCoViewer(_BaseWidget):
         self.on_msg(self._receive_message)
 
     def _receive_message(self, widget, content, buffers):
+
+        print("in _receive_message")
+
+        print(f"[{time.monotonic():.3f}] Reply received:", content.get("id"))
+        print("Pending IDs:", list(self._pending.keys()))
         
         print("[MuJoCo] Received from JavaScript:", content)
 
@@ -84,15 +90,16 @@ class MuJoCoViewer(_BaseWidget):
         """Fire-and-forget command; frontend must be initialized."""
         self.send({"op": op, **kwargs})
 
-    async def _request(self, op, timeout=10.0, **kwargs):
+    async def _request(self, op, timeout=30.0, **kwargs):
         loop = asyncio.get_running_loop()
-        import threading
-        print("Request thread:", threading.get_ident())
-        print("Request loop:", id(loop))
         request_id = next(self._request_ids)
 
         future = loop.create_future()
         self._pending[request_id] = (loop, future)
+
+        start = time.monotonic()
+
+        print(f"[{time.monotonic():.3f}] Request {request_id} created")
 
         try:
             self.send({
@@ -101,9 +108,17 @@ class MuJoCoViewer(_BaseWidget):
                 **kwargs
             })
 
+            print(f"[{time.monotonic():.3f}] Request sent")
+
             return await asyncio.wait_for(future, timeout=timeout)
 
         finally:
+            print(
+                f"[{time.monotonic():.3f}] "
+                f"Removing request {request_id}, "
+                f"elapsed={time.monotonic() - start:.2f}s"
+            )
+
             self._pending.pop(request_id, None)
 
     def play(self): self._send_command("play")
