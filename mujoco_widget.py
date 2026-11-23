@@ -2,6 +2,8 @@
 from pathlib import Path
 import asyncio
 import itertools
+import sys
+import sys
 import threading
 import anywidget
 import traitlets
@@ -91,6 +93,8 @@ class MuJoCoViewer(_BaseWidget):
         self.send({"op": op, **kwargs})
 
     async def _request(self, op, timeout=30.0, **kwargs):
+        import sys
+        from ipykernel.iostream import OutStream
         loop = asyncio.get_running_loop()
         request_id = next(self._request_ids)
 
@@ -107,8 +111,10 @@ class MuJoCoViewer(_BaseWidget):
                 "id": request_id,
                 **kwargs
             })
-            # Yields to the Tornado event loop so Colab dispatches the message
-            await asyncio.sleep(0.01) 
+
+            sys.stdout.flush()
+            if isinstance(sys.stdout, OutStream) and sys.stdout.pub_thread:
+                sys.stdout.pub_thread.flush() 
 
             print(f"[{time.monotonic():.3f}] Request sent")
 
