@@ -113,8 +113,8 @@ class MuJoCoViewer(_BaseWidget):
             })
 
             sys.stdout.flush()
-            if isinstance(sys.stdout, OutStream) and sys.stdout.pub_thread:
-                sys.stdout.pub_thread.flush() 
+            await asyncio.sleep(0)
+            
 
             print(f"[{time.monotonic():.3f}] Request sent")
 
