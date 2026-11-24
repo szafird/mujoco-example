@@ -26700,6 +26700,92 @@ var viewer_default = {
     let disposed = false, running = true, frame = 0, mj = null, m = null, d = null, mjScene = null, opt = null, perturb = null, cameraMJ = null;
     let renderer, controls, scene, camera, observer;
     const meshes = [];
+    const geometryCache = /* @__PURE__ */ new Map();
+    const geomTypeMesh = () => mj.mjtGeom.mjGEOM_MESH.value;
+    function geometryForVisual(g) {
+      const type = Number(g.type), size = Array.from(g.size), meshId = Number(g.dataid);
+      const key = `${type}:${meshId}:${size.join(",")}`;
+      if (geometryCache.has(key)) return { key, geometry: geometryCache.get(key) };
+      let geometry;
+      if (type === geomTypeMesh()) {
+        if (!Number.isInteger(meshId) || meshId < 0 || meshId >= Number(m.nmesh)) {
+          throw new Error(`Invalid mesh dataid=${meshId}`);
+        }
+        const vertStart = Number(m.mesh_vertadr[meshId]);
+        const vertCount = Number(m.mesh_vertnum[meshId]);
+        const faceStart = Number(m.mesh_faceadr[meshId]);
+        const faceCount = Number(m.mesh_facenum[meshId]);
+        const position = Float32Array.from(m.mesh_vert.subarray(3 * vertStart, 3 * (vertStart + vertCount)));
+        const rawIndices = m.mesh_face.subarray(3 * faceStart, 3 * (faceStart + faceCount));
+        const maxIndex = rawIndices.reduce((mx, i) => Math.max(mx, i), 0);
+        const offset = maxIndex < vertCount ? 0 : vertStart;
+        const indices = Uint32Array.from(rawIndices, (i) => i - offset);
+        if (indices.some((i) => i >= vertCount)) throw new Error(`Mesh ${meshId} has invalid face indices`);
+        geometry = new BufferGeometry();
+        geometry.setAttribute("position", new BufferAttribute(position, 3));
+        geometry.setIndex(new BufferAttribute(indices, 1));
+        geometry.computeVertexNormals();
+      } else if (type === mj.mjtGeom.mjGEOM_PLANE.value) geometry = new PlaneGeometry(size[0] > 0 ? size[0] * 2 : 20, size[1] > 0 ? size[1] * 2 : 20);
+      else if (type === mj.mjtGeom.mjGEOM_SPHERE.value) geometry = new SphereGeometry(size[0], 32, 20);
+      else if (type === mj.mjtGeom.mjGEOM_BOX.value) geometry = new BoxGeometry(2 * size[0], 2 * size[1], 2 * size[2]);
+      else if (type === mj.mjtGeom.mjGEOM_CYLINDER.value) {
+        geometry = new CylinderGeometry(size[0], size[0], 2 * size[2], 24);
+        geometry.rotateX(Math.PI / 2);
+      } else if (type === mj.mjtGeom.mjGEOM_CAPSULE.value) {
+        geometry = new CapsuleGeometry(size[0], 2 * size[2], 8, 16);
+        geometry.rotateX(Math.PI / 2);
+      } else if (type === mj.mjtGeom.mjGEOM_ELLIPSOID.value) {
+        geometry = new SphereGeometry(1, 24, 16);
+        geometry.scale(...size);
+      } else geometry = new SphereGeometry(1e-3, 8, 6);
+      geometryCache.set(key, geometry);
+      return { key, geometry };
+    }
+    async function loadXmlWithAssets(xml, meshSourceUrl) {
+      if (!meshSourceUrl) return mj.MjModel.from_xml_string(xml);
+      const sourceBase = new URL(meshSourceUrl.endsWith("/") ? meshSourceUrl : meshSourceUrl + "/");
+      if (sourceBase.protocol !== "https:") throw new Error("mesh_source_url must use HTTPS");
+      const parsed = new DOMParser().parseFromString(xml, "application/xml");
+      if (parsed.querySelector("parsererror")) throw new Error("Invalid MJCF XML");
+      const compiler = parsed.querySelector("compiler");
+      const meshdir = (compiler?.getAttribute("meshdir") || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+      if (meshdir.includes("..") || meshdir.startsWith("/")) throw new Error("Unsupported meshdir path");
+      const relativeNames = [...parsed.querySelectorAll("asset > mesh[file]")].map((e) => e.getAttribute("file"));
+      const names = [...new Set(relativeNames)];
+      for (const name of names) if (!name || name.startsWith("/") || name.split("/").includes("..")) throw new Error(`Unsafe mesh filename ${name}`);
+      const fs = mj.FS;
+      const root2 = `/so101_${Math.random().toString(36).slice(2)}`;
+      fs.mkdir(root2);
+      const makeDirs = (path) => {
+        let cursor = root2;
+        for (const part of path.split("/").filter(Boolean)) {
+          cursor += "/" + part;
+          try {
+            fs.mkdir(cursor);
+          } catch (e) {
+            if (!fs.analyzePath(cursor).exists) throw e;
+          }
+        }
+      };
+      makeDirs(meshdir);
+      setStatus(`Downloading ${names.length} Menagerie meshes\u2026`);
+      const files = await Promise.all(names.map(async (name) => {
+        const url = new URL(name, sourceBase);
+        if (!url.href.startsWith(sourceBase.href)) throw new Error(`Mesh URL outside asset directory: ${name}`);
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Failed to fetch ${url.href}: HTTP ${response.status}`);
+        return [name, new Uint8Array(await response.arrayBuffer())];
+      }));
+      for (const [name, bytes] of files) {
+        const full = [meshdir, name].filter(Boolean).join("/");
+        makeDirs(full.split("/").slice(0, -1).join("/"));
+        fs.writeFile(`${root2}/${full}`, bytes);
+      }
+      fs.writeFile(`${root2}/model.xml`, xml);
+      setStatus("Compiling MuJoCo mesh model\u2026");
+      if (typeof mj.MjModel.mj_loadXML === "function") return mj.MjModel.mj_loadXML(`${root2}/model.xml`);
+      throw new Error("The hosted MuJoCo loader does not expose MjModel.mj_loadXML; check that the WASM version is 3.17.0");
+    }
     const setStatus = (s) => {
       status.textContent = s;
       model.set("status", s);
@@ -26805,7 +26891,11 @@ var viewer_default = {
       setStatus("Initializing MuJoCo WASM\u2026");
       mj = await getMujoco(assetBase);
       if (disposed) return;
-      m = mj.MjModel.from_xml_string(model.get("xml"));
+      m = await loadXmlWithAssets(model.get("xml"), model.get("mesh_source_url"));
+      if (disposed) {
+        m?.delete();
+        return;
+      }
       d = new mj.MjData(m);
       opt = new mj.MjvOption();
       perturb = new mj.MjvPerturb();
@@ -26820,11 +26910,17 @@ var viewer_default = {
       camera = new PerspectiveCamera(45, 1, 0.01, 100);
       camera.up.set(0, 0, 1);
       camera.position.set(2.8, -3.8, 2.6);
+      const targetPoint = model.get("camera_target") || [0, 0, 0.5];
+      const requestedDistance = Number(model.get("camera_distance") || 0);
+      if (requestedDistance > 0 && Array.isArray(targetPoint) && targetPoint.length === 3) {
+        const center = new Vector3(...targetPoint);
+        camera.position.copy(center.clone().add(new Vector3(1.2, -1.5, 0.9).normalize().multiplyScalar(requestedDistance)));
+      }
       renderer = new WebGLRenderer({ antialias: true });
       renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
       viewport.append(renderer.domElement);
       controls = new OrbitControls(camera, renderer.domElement);
-      controls.target.set(0, 0, 0.5);
+      controls.target.set(...model.get("camera_target") || [0, 0, 0.5]);
       controls.update();
       const resize = () => {
         const w = viewport.clientWidth || 700, h = viewport.clientHeight;
@@ -26859,23 +26955,24 @@ var viewer_default = {
         for (let i = 0; i < count; i++) {
           const g = geoms.get(i);
           const type = Number(g.type), s = Array.from(g.size), rgba = Array.from(g.rgba), p = Array.from(g.pos), r = Array.from(g.mat);
+          const { key, geometry } = geometryForVisual(g);
           let mesh = meshes[i];
+          if (mesh && mesh.userData.geometryKey !== key) {
+            scene.remove(mesh);
+            mesh.material.dispose();
+            meshes[i] = null;
+            mesh = null;
+          }
           if (!mesh) {
-            let geometry;
-            if (type === mj.mjtGeom.mjGEOM_PLANE.value) geometry = new PlaneGeometry(s[0] > 0 ? s[0] * 2 : 20, s[1] > 0 ? s[1] * 2 : 20);
-            else if (type === mj.mjtGeom.mjGEOM_SPHERE.value) geometry = new SphereGeometry(s[0], 32, 20);
-            else if (type === mj.mjtGeom.mjGEOM_BOX.value) geometry = new BoxGeometry(2 * s[0], 2 * s[1], 2 * s[2]);
-            else if (type === mj.mjtGeom.mjGEOM_CYLINDER.value) {
-              geometry = new CylinderGeometry(s[0], s[0], 2 * s[2], 24);
-              geometry.rotateX(Math.PI / 2);
-            } else if (type === mj.mjtGeom.mjGEOM_CAPSULE.value) {
-              geometry = new CapsuleGeometry(s[0], 2 * s[2], 8, 16);
-              geometry.rotateX(Math.PI / 2);
-            } else geometry = new SphereGeometry(0.01, 8, 6);
-            mesh = new Mesh(geometry, new MeshPhongMaterial({ color: new Color(rgba[0], rgba[1], rgba[2]), transparent: rgba[3] < 1, opacity: rgba[3], side: DoubleSide }));
+            mesh = new Mesh(geometry, new MeshPhongMaterial({ color: 16777215, side: DoubleSide }));
+            mesh.userData.geometryKey = key;
             scene.add(mesh);
             meshes[i] = mesh;
           }
+          const material = mesh.material;
+          material.color.setRGB(rgba[0], rgba[1], rgba[2]);
+          material.opacity = rgba[3];
+          material.transparent = rgba[3] < 1;
           mesh.matrixAutoUpdate = false;
           mesh.matrix.set(r[0], r[1], r[2], p[0], r[3], r[4], r[5], p[1], r[6], r[7], r[8], p[2], 0, 0, 0, 1);
           mesh.matrixWorldNeedsUpdate = true;
@@ -26906,9 +27003,9 @@ var viewer_default = {
       observer?.disconnect();
       controls?.dispose();
       for (const mesh of meshes) {
-        mesh.geometry.dispose();
-        mesh.material.dispose();
+        mesh?.material.dispose();
       }
+      for (const geometry of geometryCache.values()) geometry.dispose();
       renderer?.dispose();
       mjScene?.delete();
       cameraMJ?.delete();

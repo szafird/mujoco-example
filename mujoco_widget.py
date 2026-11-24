@@ -63,7 +63,12 @@ class ControllerRun:
 class MuJoCoViewer(_BaseWidget):
     _esm = ROOT / "dist" / "viewer.js"
     xml = traitlets.Unicode("").tag(sync=True)
+    # Optional public HTTPS base directory for STL assets referenced by the MJCF.
+    mesh_source_url = traitlets.Unicode("").tag(sync=True)
     sim_time = traitlets.Float(0.0).tag(sync=True)
+    # Optional close-up camera for small tabletop robots; zero preserves V4 default.
+    camera_distance = traitlets.Float(0.0).tag(sync=True)
+    camera_target = traitlets.List(trait=traitlets.Float(), default_value=[0.0, 0.0, 0.5]).tag(sync=True)
 
     def __init__(self, xml, asset_base, **kwargs):
         self._requests = {}
